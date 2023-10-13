@@ -27,8 +27,8 @@ def predict(dt: float, old_x, old_p, sigma):
     F = np.array([[1, dt], [0,1]])
     G = np.array([[0.5*dt**2],[dt]])
 
-    print(f"F is {F}")
-    print(f"G is {G}")
+    #print(f"F is {F}")
+    #print(f"G is {G}")
 
     new_x = F @ old_x
 
@@ -59,20 +59,30 @@ def use_sensor_values_for_something(sensor_value, old_x, old_p, DT, sigma):
         print(f"error in update: {str(e)}")
         
     #print(new_x)
+    return new_x, new_p
 
 def arduino_has_been_reset():
     print("Arduino is offline.. Resetting")
 
 
 
+
 estimate = 0.0
 delta = 1.0
 T = time.time()
-sigma_r = 2
+sigma_r = 1.175363805
+
 sigma_a = 1.13105E-07
+positions = []
+measurements = []
+i=0
 
-
-while True:
+old_x = np.array([[236],
+                      [0]]) #initial position and speed
+old_p = np.array([[1,0],
+                    [0,2]]) #covariance matrix.. how certain i am about the initial contitions
+while i<1000:
+    i = i+1
     dt = time.time() - T
     T = time.time()
     try:
@@ -81,12 +91,24 @@ while True:
     except:
         range_measurement = 10
     #print(measured_values)
-    old_x = np.array([[0],
-                      [0]]) #initial position and speed
-    old_p = np.array([[1,0],
-                        [0,2]]) #covariance matrix.. how certain i am about the initial contitions
+    
     old_x, old_y = use_sensor_values_for_something(range_measurement, old_x, old_p, dt, sigma_r)
-    print(f"old_x is {old_x}, range measurement is {range_measurement}")
+    positions.append(old_x[0][0])
+    measurements.append(range_measurement)
+    print(f"old_x is {old_x[0]}, range measurement is {range_measurement}")
+
+
+plt.xlabel('Time step')
+plt.ylabel('Position')
+plt.ylim(70, 260)
+plt.xlim(0, 5000)
+plt.legend()
+
+
+plt.plot(positions, label='Estimated Position')
+plt.plot(measurements, label='Measured Position')
+plt.show()
+
     
 
 
