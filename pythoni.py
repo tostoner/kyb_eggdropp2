@@ -48,9 +48,24 @@ def update(meas_value, meas_variance, new_x, new_p):
 
     return new_x,new_p
 
+def upNdown(current_pos,setpoint_low, setpoint_high, final_dest):
+    counter = 0
+    position = "high"
+    while counter < 5:
+        counter = counter +1
+        if current_pos >= setpoint_high and position == "high":
+            #goto low
+            position = "low"
+        if current_pos >= setpoint_low and position == "low":
+            #goto high
+            position = "high"
+            pass #move down
+    #goto final dest
+    #after upNdown, move to final destination
+    
 
 
-def use_sensor_values_for_something(sensor_value, old_x, old_p, DT, sigma):
+def kalmanfilter(sensor_value, old_x, old_p, DT, sigma):
     
     new_x,new_p = predict(DT, old_x, old_p, sigma)
     try:
@@ -76,12 +91,13 @@ sigma_a = 1.13105E-07
 positions = []
 measurements = []
 i=0
+setpoint = 150
 
 old_x = np.array([[236],
                       [0]]) #initial position and speed
-old_p = np.array([[1,0],
-                    [0,2]]) #covariance matrix.. how certain i am about the initial contitions
-while i<1000:
+old_p = np.array([[0.1,0],
+                    [0,10]]) #covariance matrix.. how certain i am about the initial contitions
+while i<1000: #endre til while true når vis kjøre skjikkelig
     i = i+1
     dt = time.time() - T
     T = time.time()
@@ -92,7 +108,12 @@ while i<1000:
         range_measurement = 10
     #print(measured_values)
     
-    old_x, old_y = use_sensor_values_for_something(range_measurement, old_x, old_p, dt, sigma_r)
+    old_x, old_y = kalmanfilter(range_measurement, old_x, old_p, dt, sigma_r)
+
+    
+    #upNdown(old_x[0][0], 100, 200, setpoint)
+
+
     positions.append(old_x[0][0])
     measurements.append(range_measurement)
     print(f"old_x is {old_x[0]}, range measurement is {range_measurement}")
@@ -101,7 +122,7 @@ while i<1000:
 plt.xlabel('Time step')
 plt.ylabel('Position')
 plt.ylim(70, 260)
-plt.xlim(0, 5000)
+plt.xlim(0, 1000)
 plt.legend()
 
 
