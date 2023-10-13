@@ -1,7 +1,8 @@
 import time
 from socket import *
 import numpy as np
-import kalmanFilter.kalmanFilter as kf
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 udp_socket = socket(AF_INET, SOCK_DGRAM)
 udp_socket.settimeout(1)
@@ -21,50 +22,84 @@ def arduino_send_receive(estimate):
         return np.array(inbound_message.decode('ascii').split(',')).astype(float)
     except Exception as e:
         print(e)
+def predict(dt: float, old_x, old_p, sigma):
+
+    F = np.array([[1, dt], [0,1]])
+    G = np.array([[0.5*dt**2],[dt]])
+
+    print(f"F is {F}")
+    print(f"G is {G}")
+
+    new_x = F @ old_x
+
+    new_p = F @ old_p @ F.T + G @ G.T *sigma
+    return new_x, new_p
+
+def update(meas_value, meas_variance, new_x, new_p):
+    H = np.array([[1, 0]])
+    z = np.array([meas_value])
+    R = np.array([meas_variance])
+    y = z - H @ new_x
+    S = H @ new_p @ H.T + R
+    K = new_p @ H.T @ np.linalg.inv(S)
+
+    new_x = new_x + K@y
+    new_p = (np.eye(2) - K @ H) @ new_p
+
+    return new_x,new_p
 
 
-def use_sensor_values_for_something(sensor_values):
-    dt = 1.0/60
-    sigma_r = 1.908487197
 
-    sigma_a = 1.13105E-07
-
-
-    F = np.array([[1, dt, 0], [0, 1, dt], [0, 0, (dt**2)/2]]) #X_k
-
-    Q = np.array([[(dt**6)/36, (dt**5)/12, (dt**4)/6], [(dt**5)/12, (dt**4)/6, (dt**3)/2], [(dt**4)/6, (dt**3)/2, dt**2]])
-    H_r = np.array([[1, 0, 0]])
-    H_a = np.array([[0, 0, 1]])
-
-    R_r = np.array([sigma_r])
-    R_a = np.array([sigma_a])
-
-
-    x = np.linspace(0,0,0)
-    measurements = - (x**2 + 2*x - 2)  + np.random.normal(0, 2, 100)
-
-   
-    # kf = KalmanFilter(F=F, H=H, Q=Q, R=R)
-
-    predictions = []
-
+def use_sensor_values_for_something(sensor_value, old_x, old_p, DT, sigma):
+    
+    new_x,new_p = predict(DT, old_x, old_p, sigma)
+    try:
+        new_x, new_p = update(sensor_value, sigma, new_x, new_p)
+    except Exception as e:
+        print(f"error in update: {str(e)}")
+        
+    #print(new_x)
 
 def arduino_has_been_reset():
     print("Arduino is offline.. Resetting")
 
 
+
 estimate = 0.0
 delta = 1.0
-while(True):
-    estimate = estimate + delta
-    if(estimate > 100.0):
-        delta = -1
-    elif(estimate < -100):
-        delta = 1
+T = time.time()
+sigma_r = 2
+sigma_a = 1.13105E-07
 
-    sensor_values = arduino_send_receive(estimate)
-    if(sensor_values is not None):
-        use_sensor_values_for_something(sensor_values)
-    else:
-        arduino_has_been_reset()
+
+while True:
+    dt = time.time() - T
+    T = time.time()
+    try:
+        measured_values = arduino_send_receive(estimate)
+        range_measurement = measured_values[-1]
+    except:
+        range_measurement = 10
+    #print(measured_values)
+    old_x = np.array([[0],
+                      [0]]) #initial position and speed
+    old_p = np.array([[1,0],
+                        [0,2]]) #covariance matrix.. how certain i am about the initial contitions
+    old_x, old_y = use_sensor_values_for_something(range_measurement, old_x, old_p, dt, sigma_r)
+    print(f"old_x is {old_x}, range measurement is {range_measurement}")
+    
+
+
+
+    #estimate = estimate + delta
+    #if(estimate > 100.0):
+    #    delta = -1
+    #elif(estimate < -100):
+    #    delta = 1
+#
+    #sensor_values = arduino_send_receive(estimate)
+    #if(sensor_values is not None):
+    #    use_sensor_values_for_something(sensor_values)
+    #else:
+    #    arduino_has_been_reset()
 
